@@ -2,10 +2,27 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { db } from './db.mjs';
-import { fetchProductWithConfig } from './creators-api.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Database setup
+let db;
+
+async function setupDatabase() {
+  if (process.env.DATABASE_URL) {
+    console.log('Using PostgreSQL database (Railway)');
+    const { db: pgDb, migrate } = await import('./db-pg.mjs');
+    await migrate(); // Auto-create tables on Railway
+    return pgDb;
+  } else {
+    console.log('Using team-db (sandbox)');
+    const { db: teamDb } = await import('./db.mjs');
+    return teamDb;
+  }
+}
+
+db = await setupDatabase();
+import { fetchProductWithConfig } from './creators-api.mjs';
 
 const app = express();
 app.use(cors());
