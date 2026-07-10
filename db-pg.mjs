@@ -215,5 +215,4 @@ export async function migrate() {
   console.log('Database tables ready');
 }
 
-export { db };
 export default db;
