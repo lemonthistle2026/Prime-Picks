@@ -9,16 +9,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let db;
 
 async function setupDatabase() {
+  console.log('DATABASE_URL present:', !!process.env.DATABASE_URL);
   if (process.env.DATABASE_URL) {
     console.log('Using PostgreSQL database (Railway)');
-    const { db: pgDb, migrate } = await import('./db-pg.mjs');
-    await migrate(); // Auto-create tables on Railway
-    return pgDb;
-  } else {
-    console.log('Using team-db (sandbox)');
-    const { db: teamDb } = await import('./db.mjs');
-    return teamDb;
+    try {
+      const { db: pgDb, migrate } = await import('./db-pg.mjs');
+      await migrate();
+      return pgDb;
+    } catch (err) {
+      console.error('PostgreSQL setup failed:', err.message);
+      console.log('Falling back to team-db');
+      const { db: teamDb } = await import('./db.mjs');
+      return teamDb;
+    }
   }
+  console.log('Using team-db (sandbox)');
+  const { db: teamDb } = await import('./db.mjs');
+  return teamDb;
 }
 
 db = await setupDatabase();
@@ -457,12 +464,19 @@ app.post('/api/packages/generate', async (req, res) => {
   }
 });
 
+app.get('/', (req, res) => {
+  res.redirect('/p');
+});
+
+// Serve admin dashboard
+app.use('/admin', express.static(path.join(__dirname, 'dist')));
+app.get('/admin*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
 // Serve built frontend in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, 'dist')));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-  });
 }
 
 const PORT = process.env.PORT || 3000;
