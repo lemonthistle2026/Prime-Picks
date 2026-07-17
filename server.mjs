@@ -227,20 +227,21 @@ app.get('/p/:id', async (req, res) => {
     `;
 
     const htmlContent = `
-      <div class="product-card">
+      <div class="product-detail">
         <h1 class="product-title">${pkg.product_name}</h1>
-        <div class="price-tag">Check Price on Amazon</div>
+        <div class="price-tag">${product.price || 'Check Amazon'}</div>
         
         <div class="image-gallery">
-          ${(product.image_urls ? JSON.parse(product.image_urls) : []).map(url => `<img src="${url}" alt="${pkg.product_name}">`).join('')}
+          ${(product.image_urls ? JSON.parse(product.image_urls) : []).map(url => `<img src="${url}" alt="${pkg.product_name}" onerror="this.style.display='none'">`).join('')}
+          ${!(product.image_urls ? JSON.parse(product.image_urls).length : 0) ? `<img src="${content.mainImageUrl || ''}" alt="${pkg.product_name}" onerror="this.style.display='none'">` : ''}
         </div>
 
         <div class="product-overview">
-          ${mdToHtml(content.product_overview)}
+          ${mdToHtml(content.product_overview || '')}
         </div>
 
         <a href="${product.affiliate_link}" class="amazon-button" target="_blank" rel="noopener noreferrer">
-          Check Price on Amazon
+          Get The Best Price Here!
         </a>
 
         <h2 class="section-title">Key Features</h2>
@@ -250,27 +251,29 @@ app.get('/p/:id', async (req, res) => {
 
         <div class="feedback-summary">
           <h2 class="section-title" style="margin-top: 0; border: none;">What customers commonly say</h2>
-          <p>${content.customer_feedback_summary}</p>
+          ${content.customer_feedback_summary?.themes ? content.customer_feedback_summary.themes.map(t => `<p><strong>${t.theme || ''}:</strong> ${t.detail || t.sentiment || ''}</p>`).join('') : `<p>${typeof content.customer_feedback_summary === 'string' ? content.customer_feedback_summary : 'Customer feedback coming soon.'}</p>`}
         </div>
 
-        <div style="display: flex; gap: 40px; margin-top: 30px;">
-          <div style="flex: 1;">
+        <div style="display: flex; gap: 40px; margin-top: 30px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 200px;">
             <h3 class="pros">Pros</h3>
             <ul class="pros-cons">
-              ${(content.pros_and_cons?.pros || []).map(p => `<li>${p}</li>`).join('')}
+              ${(content.pros || content.pros_and_cons?.pros || []).map(p => `<li>${p}</li>`).join('')}
+              ${!(content.pros || content.pros_and_cons?.pros || []).length ? '<li>Features coming soon</li>' : ''}
             </ul>
           </div>
-          <div style="flex: 1;">
+          <div style="flex: 1; min-width: 200px;">
             <h3 class="cons">Cons</h3>
             <ul class="pros-cons">
-              ${(content.pros_and_cons?.cons || []).map(c => `<li>${c}</li>`).join('')}
+              ${(content.cons || content.pros_and_cons?.cons || []).map(c => `<li>${c}</li>`).join('')}
+              ${!(content.cons || content.pros_and_cons?.cons || []).length ? '<li>Considerations coming soon</li>' : ''}
             </ul>
           </div>
         </div>
 
         <h2 class="section-title">Detailed Review</h2>
         <div class="product-copy">
-          ${mdToHtml(content.product_page_copy)}
+          ${mdToHtml(content.product_page_copy || '')}
         </div>
 
         <h2 class="section-title">Frequently Asked Questions</h2>
@@ -281,11 +284,16 @@ app.get('/p/:id', async (req, res) => {
               <div class="faq-answer">${item.answer}</div>
             </div>
           `).join('')}
+          ${!(content.faq || []).length ? '<p>FAQ coming soon.</p>' : ''}
         </div>
 
         <a href="${product.affiliate_link}" class="amazon-button" target="_blank" rel="noopener noreferrer">
-          View "${pkg.product_name}" on Amazon
+          Get The Best Price Here!
         </a>
+        
+        <div class="disclosure-block">
+          ${content.disclosure_block || 'As an Amazon Associate, I earn from qualifying purchases.'}
+        </div>
       </div>
     `;
 
