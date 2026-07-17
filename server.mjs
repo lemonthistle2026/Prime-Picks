@@ -187,13 +187,14 @@ app.get('/p', async (req, res) => {
     
     const content = `
       <h2 class="section-title">Latest Smart Finds</h2>
-      <div class="product-list">
+      <div class="product-grid">
         ${approvedPackages.map(p => `
-          <a href="/p/${p.id}" class="product-list-item">
-            <img src="${(safeParseJson(p.package_json, {}).mainImageUrl || '')}" alt="${p.product_name}">
-            <div>
-              <div style="font-weight: bold; font-size: 18px;">${p.product_name}</div>
-              <div style="color: #666; font-size: 14px;">${(safeParseJson(p.package_json, {}).product_overview?.substring(0, 100) || '')}...</div>
+          <a href="/p/${p.id}" class="product-card">
+            <img src="${(safeParseJson(p.package_json, {}).mainImageUrl || '')}" alt="${p.product_name}" onerror="this.style.display='none'">
+            <div class="card-body">
+              <h3>${p.product_name}</h3>
+              <div class="price">${p.price || 'Check Amazon'}</div>
+              <div style="color: #666; font-size: 13px; margin-top: 8px;">${(safeParseJson(p.package_json, {}).product_overview?.substring(0, 120) || '')}...</div>
             </div>
           </a>
         `).join('')}
