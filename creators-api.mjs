@@ -135,21 +135,28 @@ export async function fetchProductsBatch(asinList, tag, region, clientId, client
  * This is the main entry point for pipeline integration.
  */
 export async function fetchProductWithConfig(asin) {
-  const { execSync } = await import('child_process');
-  
-  function db(query) {
-    const output = execSync(`team-db "${query.replace(/"/g, '\\"')}"`, { encoding: 'utf-8' });
-    return JSON.parse(output);
+  // Try environment variables first (Railway), then config table
+  let clientId = process.env.creators_api_client_id || process.env.CREATORS_API_CLIENT_ID;
+  let clientSecret = process.env.creators_api_client_secret || process.env.CREATORS_API_CLIENT_SECRET;
+  let tag = process.env.creators_api_tag || process.env.CREATORS_API_TAG || process.env.ASSOCIATE_TAG;
+  let region = process.env.creators_api_region || process.env.CREATORS_API_REGION || 'US';
+
+  // Fallback to config table (sandbox)
+  if (!clientId || !clientSecret || !tag) {
+    try {
+      const { execSync } = await import('child_process');
+      const output = execSync(`team-db "SELECT key, value FROM config WHERE key LIKE 'creators_api_%'"`, { encoding: 'utf-8' });
+      const configs = JSON.parse(output);
+      const config = {};
+      configs.forEach(c => { config[c.key] = c.value; });
+      clientId = clientId || config['creators_api_client_id'];
+      clientSecret = clientSecret || config['creators_api_client_secret'];
+      tag = tag || config['creators_api_tag'];
+      region = region || config['creators_api_region'] || 'US';
+    } catch (e) {
+      // team-db not available (production/Railway)
+    }
   }
-
-  const configs = db("SELECT key, value FROM config WHERE key LIKE 'creators_api_%'");
-  const config = {};
-  configs.forEach(c => { config[c.key] = c.value; });
-
-  const clientId = config['creators_api_client_id'];
-  const clientSecret = config['creators_api_client_secret'];
-  const tag = config['creators_api_tag'];
-  const region = config['creators_api_region'] || 'US';
 
   if (!clientId || !clientSecret || !tag) {
     throw new Error('Creators API not configured. Set creators_api_client_id, creators_api_client_secret, and creators_api_tag in config table.');
