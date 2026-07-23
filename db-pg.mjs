@@ -212,6 +212,17 @@ export async function migrate() {
   await runQuery(`
     CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT);
   `);
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      title TEXT,
+      description TEXT,
+      status TEXT,
+      assigned_to TEXT,
+      created_by TEXT,
+      created_at TEXT
+    );
+  `);
   console.log('Database tables ready');
 }
 
