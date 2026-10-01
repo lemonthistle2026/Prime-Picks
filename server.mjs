@@ -179,21 +179,70 @@ function layout(title, content, meta = '') {
 // API Endpoints
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/api/debug/creators/:asin', async (req, res) => {
+  try {
+    const data = await fetchProductWithConfig(req.params.asin);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ 
+      success: false, 
+      error: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  }
+});
+
+app.post('/api/products/batch', async (req, res) => {
+  const { asins, category } = req.body;
+  if (!asins || !Array.isArray(asins)) {
+    return res.status(400).json({ error: 'asins array is required' });
+  }
+
+  const results = [];
+  for (const asin of asins) {
+    try {
+      const id = `prod_${Date.now()}_${asin}`;
+      const enrichedData = await enrichProductData({ asin, category });
+      const newProduct = { ...enrichedData, id };
+      await db.createProduct(newProduct);
+      results.push({ asin, success: true, id });
+    } catch (err) {
+      results.push({ asin, success: false, error: err.message });
+    }
+  }
+  res.json({ results });
+});
+
 // Public Website Routes
 app.get('/p', async (req, res) => {
   try {
     const packages = await db.getPackages();
     const approvedPackages = packages.filter(p => p.status === 'approved');
     
+    // Extract categories
+    const categories = [...new Set(approvedPackages.map(p => p.category || 'General'))].sort();
+    const categoryCounts = categories.reduce((acc, cat) => {
+      acc[cat] = approvedPackages.filter(p => (p.category || 'General') === cat).length;
+      return acc;
+    }, {});
+
     const content = `
+      <div class="category-nav">
+        <a href="/p" class="cat-link active">All</a>
+        ${categories.map(cat => `
+          <a href="/p/category/${cat.toLowerCase().replace(/\s+/g, '-')}" class="cat-link">${cat} (${categoryCounts[cat]})</a>
+        `).join('')}
+      </div>
+
       <h2 class="section-title">Latest Smart Finds</h2>
       <div class="product-grid">
         ${approvedPackages.map(p => `
           <a href="/p/${p.id}" class="product-card">
             <img src="${(safeParseJson(p.package_json, {}).mainImageUrl || '')}" alt="${p.product_name}" onerror="this.style.display='none'">
             <div class="card-body">
+              <span class="category-badge">${p.category || 'General'}</span>
               <h3>${p.product_name}</h3>
-              <div class="price">${p.price || 'Check Amazon'}</div>
+              <div class="price">${p.price ? `${p.price}` : 'Check Amazon'}</div>
               <div style="color: #666; font-size: 13px; margin-top: 8px;">${(safeParseJson(p.package_json, {}).product_overview?.substring(0, 120) || '')}...</div>
             </div>
           </a>
@@ -203,6 +252,51 @@ app.get('/p', async (req, res) => {
     `;
     
     res.send(layout('Prime Picks — Smart Amazon finds, handpicked for you', content));
+  } catch (err) {
+    res.status(500).send('Error loading page');
+  }
+});
+
+app.get('/p/category/:slug', async (req, res) => {
+  try {
+    const packages = await db.getPackages();
+    const approvedPackages = packages.filter(p => p.status === 'approved');
+    
+    const slug = req.params.slug;
+    const categoryName = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    
+    const filteredPackages = approvedPackages.filter(p => 
+      (p.category || 'General').toLowerCase().replace(/\s+/g, '-') === slug
+    );
+
+    const categories = [...new Set(approvedPackages.map(p => p.category || 'General'))].sort();
+    
+    const content = `
+      <div class="category-nav">
+        <a href="/p" class="cat-link">All</a>
+        ${categories.map(cat => {
+          const catSlug = cat.toLowerCase().replace(/\s+/g, '-');
+          return `<a href="/p/category/${catSlug}" class="cat-link ${catSlug === slug ? 'active' : ''}">${cat}</a>`;
+        }).join('')}
+      </div>
+
+      <h2 class="section-title">${categoryName} Picks</h2>
+      <div class="product-grid">
+        ${filteredPackages.map(p => `
+          <a href="/p/${p.id}" class="product-card">
+            <img src="${(safeParseJson(p.package_json, {}).mainImageUrl || '')}" alt="${p.product_name}" onerror="this.style.display='none'">
+            <div class="card-body">
+              <h3>${p.product_name}</h3>
+              <div class="price">${p.price ? `${p.price}` : 'Check Amazon'}</div>
+              <div style="color: #666; font-size: 13px; margin-top: 8px;">${(safeParseJson(p.package_json, {}).product_overview?.substring(0, 120) || '')}...</div>
+            </div>
+          </a>
+        `).join('')}
+      </div>
+      ${filteredPackages.length === 0 ? `<p>No products found in ${categoryName}.</p>` : ''}
+    `;
+    
+    res.send(layout(`${categoryName} Picks — Prime Picks`, content));
   } catch (err) {
     res.status(500).send('Error loading page');
   }

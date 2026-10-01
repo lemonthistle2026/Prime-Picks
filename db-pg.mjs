@@ -181,6 +181,39 @@ export const db = {
   async setConfig(key, value) {
     const sql = `INSERT INTO config (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2`;
     await runQuery(sql, [key, value]);
+  },
+
+  // Digital Products (Career Pivot)
+  async getDigitalProducts() {
+    return await runQuery('SELECT * FROM digital_products ORDER BY created_at DESC');
+  },
+
+  async getDigitalProduct(id) {
+    const results = await runQuery('SELECT * FROM digital_products WHERE id = $1 OR slug = $1', [id]);
+    return results[0];
+  },
+
+  async createDigitalProduct(product) {
+    const {
+      id, slug, name, description, price, features, image_urls, 
+      gumroad_url, is_featured, created_at
+    } = product;
+
+    const sql = `INSERT INTO digital_products (
+      id, slug, name, description, price, features, image_urls, 
+      gumroad_url, is_featured, created_at
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+    )`;
+    
+    const params = [
+      id, slug, name, description || '', price || 0, 
+      JSON.stringify(features || []), JSON.stringify(image_urls || []), 
+      gumroad_url || '', is_featured ? 1 : 0, created_at || new Date().toISOString()
+    ];
+
+    await runQuery(sql, params);
+    return product;
   }
 };
 
@@ -193,6 +226,13 @@ export async function migrate() {
       description TEXT DEFAULT '', image_urls TEXT DEFAULT '[]',
       customer_feedback TEXT DEFAULT '{}', target_audience TEXT DEFAULT '',
       seo_keywords TEXT DEFAULT '[]', affiliate_link TEXT DEFAULT '', created_at TEXT DEFAULT ''
+    );
+  `);
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS digital_products (
+      id TEXT PRIMARY KEY, slug TEXT UNIQUE, name TEXT, description TEXT DEFAULT '',
+      price REAL DEFAULT 0, features TEXT DEFAULT '[]', image_urls TEXT DEFAULT '[]',
+      gumroad_url TEXT DEFAULT '', is_featured INTEGER DEFAULT 0, created_at TEXT DEFAULT ''
     );
   `);
   await runQuery(`

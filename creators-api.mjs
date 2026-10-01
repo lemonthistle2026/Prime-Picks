@@ -17,7 +17,7 @@ async function getAccessToken(clientId, clientSecret) {
     grant_type: 'client_credentials',
     client_id: clientId,
     client_secret: clientSecret,
-    scope: 'creators_api'
+    scope: 'profile'
   });
 
   const response = await fetch(TOKEN_URL, {
@@ -28,6 +28,8 @@ async function getAccessToken(clientId, clientSecret) {
 
   if (!response.ok) {
     const text = await response.text();
+    console.error(`Token request failed. Status: ${response.status}`);
+    console.error(`Response body: ${text}`);
     throw new Error(`Token request failed (${response.status}): ${text}`);
   }
 
@@ -53,10 +55,18 @@ export async function fetchProductByAsin(asin, tag, region = 'US', clientId, cli
 
   if (!response.ok) {
     const text = await response.text();
+    console.error(`Product fetch failed for ASIN ${asin}. Status: ${response.status}`);
+    console.error(`Headers:`, JSON.stringify([...response.headers.entries()]));
+    console.error(`Response body: ${text}`);
     throw new Error(`Product fetch failed (${response.status}): ${text}`);
   }
 
   const data = await response.json();
+  console.log(`Creators API response for ${asin}:`, JSON.stringify(data).substring(0, 500) + '...');
+
+  if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
+    console.warn(`Creators API returned empty data for ASIN ${asin}`);
+  }
 
   // Normalize the API response to our format
   return normalizeProductData(data, asin, tag);
